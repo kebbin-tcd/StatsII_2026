@@ -1,0 +1,153 @@
+\documentclass[12pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs} 
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings} 
+\usepackage{color}
+\usepackage{setspace}
+\usepackage{dcolumn} 
+\usepackage{adjustbox}
+\usepackage{graphicx}
+\onehalfspacing
+
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+\lstset{backgroundcolor=\color{backcolour}, commentstyle=\color{codegreen}, keywordstyle=\color{magenta}, basicstyle=\ttfamily\footnotesize, breaklines=true, language=R}
+
+\title{Replication Project: NGO Aid, Pushing Back or Backing Down?}
+\author{Nour Kebbi \\ Student ID: 23350337}
+\date{March 29, 2026}
+
+\begin{document}
+
+\maketitle
+\begin{center}
+    Trinity College Dublin \\
+    Applied Statistical Methods II (POP77004-202526)
+\end{center}
+
+\section{Study Selection}
+I chose to replicate the research by Right, L., Springman, J. and Wibbels, E. (2025) ‘Pushing Back or Backing Down? Evidence on Donor Responses to Restrictive NGO Legislation’, International Organization, 79(4), pp. 759–786. doi:10.1017/S0020818325100957.
+
+The original study explores the complex relationship between non-state providers, such as NGOs, religious groups, or political parties, and the state. In many developing contexts where the state is weak, non-state providers fill critical gaps in healthcare and education. The authors investigate whether this "outsourcing" of welfare ultimately facilitates or hinders the long-term goals of state-building and political legitimacy.
+
+\section{Original Study: Objective and Hypotheses}
+The original study examines the 'foreign aid backlash' to domestic crackdowns. Specifically, it tests whether international donors 'push back' against restrictive NGO legislation by withdrawing aid, or backing down through maintaining aid flows to preserve diplomatic influence. The authors argue that donor responses are not uniform but are conditioned by the donor's democratic identity and their specific relationship with the recipient.
+However, the study states the following hypothesis: The reaction of NGOs to the restrictive law in place is not uniform and depends on two critical factors:
+\begin{itemize}
+    \item \textbf{Donor-Recipient Relationship Orientation (DOR):} The specific relationship of whether the donor prioritizes democracy aid in that specific country.
+    \item \textbf{Donor Orientation toward Democracy (DOD):} The donor’s broader, global ideological commitment to democracy promotion.
+\end{itemize}
+By analyzing these dimensions, the study clarifies why some donors withdraw aid in the face of restrictions while others remain stable.
+\subsection{Data Structure and Empirical Strategy}
+The dataset is structured in a way that tracks donor-recipient "dyads" (donations relationship) over time. To ensure a robust causal interpretation, the authors employ lagged variables in terms of year and the previous year, ensuring that the law enforcement precedes the observed change in aid. The data is further refined by filtering out country-year observations where total aid is below 2 million USD to reduce statistical noise. The data used for analysis also excludes the US to prevent large aid-flows from dominating the data analysis.
+To address potential issues with serial correlation where aid observations within the same country are likely related over time, the authors use standard errors clustered by recipient country. This is a critical identification step; without clustering, the model might overstate the statistical significance of the results by treating every 'country-year' as an entirely independent event.
+Key Variables:
+\begin{itemize}
+    \item \textbf{DOR (reactive upon law enforcement):} Coded as 1 if more than 75\% of a donor's aid to a specific country in the preceding three years was focused on democracy sectors.
+    \item \textbf{DOD (dependent on the percentage of aid over total aid):} Coded as 1 for donors in the top 25th percentile of democracy-oriented aid across their entire global portfolio.
+\end{itemize}
+
+
+\section{Model and Replication}
+The original study has 2 tables using models I am familiar with in the paper:
+
+\subsection{Table 1: Homogeneous Response to NGO Law Enactment}
+A fixed-effects linear model (\textit{felm}) is used, with the log of total aid as the dependent variable. This model controls for year and dyad fixed effects to capture average changes while accounting for time-series characteristics. 
+\input{tab_1_main_overall.tex} 
+The first model measures the main effect of how, on average, aid changes after a country passes an NGO law:
+
+\begin{lstlisting}[language=R]
+mod.0 <- felm(tot.log ~ dir.sig.event.l  | year + dyad_id | 0 | r_iso)
+mod.1 <- felm(dem.log ~ dir.sig.event.l  | year + dyad_id | 0 | r_iso)
+mod.2 <- felm(econ.log ~ dir.sig.event.l | year + dyad_id | 0 | r_iso)
+\end{lstlisting}
+
+This produced Table 1. The model compares within the same donor-recipient pair over time to test whether donors reduce aid after restrictive NGO laws. 
+
+I successfully replicated Table 1 and found the same coefficients as the original authors:
+\begin{itemize}
+    \item \textbf{Total Aid:} 0.057
+    \item \textbf{Democracy Aid:} -0.127
+    \item \textbf{Economic Aid:} 0.055
+\end{itemize}
+
+All coefficients are statistically insignificant. Hence, this means that on average, the effect of an NGO law has no impact on the volume of aid a country receives. This result is potentially misleading, which is why the authors implemented the interaction models in Table 2.
+\subsection{Table 2: Marginal Effect by Democracy Orientation}
+
+An interaction model is employed to test the varying responses of DOR and DOD donors. The choice of fixed effects in Table 2 varies by model specification:
+\begin{itemize}
+    \item \textbf{Models 1, 2, \& 3:} The authors use \textit{donor fixed effects} because the interest lies in ``Relationship Orientation'' (DOR), which varies across different recipients for the same donor.
+    \item \textbf{Models 4, 5, \& 6:} The authors use \textit{dyad fixed effects}. Since ``Donor Orientation'' (DOD) is a donor-level trait, controlling for dyad fixed effects allows for a more restricted test of how a donor's global position affects their specific response to a law passage.
+\end{itemize}
+
+The author tests whether the effect depends on the relationship level (DOR) or the donor level (DOD) using the following interaction logic:
+\begin{equation}
+    Effect = \beta_1 \cdot NGO + \beta_2 \cdot Orientation + \beta_3 \cdot (NGO \times Orientation)
+\end{equation}
+
+The R implementation for these interaction models is as follows:
+\begin{lstlisting}[language=R]
+# Relationship Orientation Model
+rel.0 <- felm(tot.log ~ dir.sig.event.l*DOR | year + d_iso | 0 | r_iso)
+
+# Donor Orientation Model
+dnr.0 <- felm(tot.log ~ dir.sig.event.l*DOD | year + dyad_id | 0 | r_iso)
+\end{lstlisting}
+\input{tab_2_main_interaction.tex}
+
+I successfully replicated Table 2, confirming the coefficients related to DOR and DOD. The coefficient for ``NGO Law $\times$ DOR'' is $-1.050$, indicating that passing a restrictive NGO law leads to a significant decrease in democracy-related aid. Furthermore, the coefficient for ``NGO Law $\times$ DOD'' is $-1.485$ for Democracy aid and $-0.772$ for Total aid. This confirms that more democratic donors reduce aid to recipient countries following the enactment of NGO laws.
+
+The key takeaway of Table 2 is that democratic orientation (both at the relationship and global level) is a significant predictor of aid withdrawal. Finally, the authors also utilize a \textit{generalized synthetic control model} to construct counterfactual scenarios, providing a causal estimate of aid levels in the absence of restrictive laws.
+
+\subsection{Dataset Variables and Controls}
+The replication dataset is organized into several categories to ensure model accuracy:
+
+\begin{description}
+    \item[Identification Variables:] \texttt{dyad\_name} (e.g., ``SRB-DE'') and \texttt{dyad\_id}, allowing the model to track specific relationships between a country receiving aid and the donor giving aid over multiple years.
+    \item[Outcome \& Treatment:] The dependent variable is the log of aid flows, while the treatment is a binary indicator for NGO restriction laws (lagged).
+    \item[Control Variables:] To avoid omitted variable bias, the model includes controls for political conditions and stability, such as \texttt{civil\_war}, press freedom indicators (\texttt{cpj.ihs}), and the strength of the political opposition (\texttt{oppseat}). These controls ensure that aid fluctuations are not erroneously attributed to NGO laws when they are actually driven by domestic instability or governance shifts.
+\end{description}
+
+\section{My Contribution}
+
+The author of the study looked at the average treatment effect of an NGO law on aid. They focus on whether donors as a group react to a specific event. I looked at what the study might be missing out on and decided to introduce two twists that shift the causal perspective and employ different statistical frameworks.
+First, the original study treats the NGO restriction law enforced as a starting point to how aid looks like after. However, governments might pass a law because aid is already declining.
+Second, the original study looks at the intensive margin of how much money flows. I would like to introduce whether there is any money flow at all. I analyze the Odds Ratio to see whether NGO laws are a deal breaker that ends the donor-recipient relationship entirely or just reduces the aid volume.
+While the original study focuses on how donors respond to laws, my contribution gives a different perspective on post-law enforcement aid and stickiness of donor aid to a country.
+
+
+\subsection{The First Twist: Predicting NGO Restrictions}
+In the first twist I try to shift the focus from donor behavior to recipient behavior by investigating whether relative reduction in aid prompts governments to restrict NGOs. Using a Logistic Regression, I estimate the probability of a country enforcing a restrictive law based on prior aid levels. Recipients may strategically select the timing of NGO crackdowns when they perceive that the 'opportunity cost' of losing aid is already low due to existing donor withdrawal. This "flips" the original model to explore whether low aid serves as a signal for recipients to tighten domestic control. 
+\newline Below is a snippet of the code:
+\lstinputlisting[language=R, firstline=1158, lastline=1175]{rsw_replication_code_NK.R}
+Code explanation: I first sort the data by the donor recepient pair dyad-id then by year. The reason behind this is to make sure it is looking at the previous year for the same country. After that I convert the passing of an NGO law to binary: 0 or 1. I used a GLM to calculate probabilities with a binary outcome. The idea was to test if aid in the past year predicts a law in the next year. The first year of each dyad lacks a prior year's observation, creating a missing value (NA) for the lagged aid variable, this is why I also removed the first year of data for every country. I also used a Logit model to predict the probability of an event occurring (either 0 or 1).
+\input{twist1_table.tex}
+\clearpage
+
+The results of the logistic regression in the table above show that the coefficient for Total Aid is 0.065. This number means that it is statistically significant, however, this impact is remarkably small when compared to the domestic control variables. Specifically, the coefficient for Civil War is 0.889 and Press Freedom is 0.254. This suggests that domestic instability and political repression are the primary drivers of restrictive NGO legislation, rather than international aid fluctuations alone. Countries experiencing civil war have significantly higher log-odds of passing these laws, confirming that they are often tools used by regimes for domestic survival during periods of conflict. In fact, civil war is the strongest predictor in the model, nearly doubling the log-odds of passing this law. While the aid variable remains significant, its minimal effect size compared to domestic factors suggests that the original study was correct to treat the law as the primary variable, though my model reveals the intense domestic pressures that often precede such legislation. When a country is in a civil war, the government’s primary goal is regime survival. They often view NGOs that are receiving foreign funding as supporting the opposition, monitor human rights abuses, or provide resources to rebels. Therefore, they pass these restrictive laws to shut down independent monitoring and consolidate control.
+
+\subsection{The Second Twist: The Odds of Giving Aid}
+In the original paper, the fluctuation that the model studies is in the amount of dollars. In the second twist, I try to analyze the binary choice of whether a donor gives anything at all. In many cases, a donor might cut off the aid completely instead of reducing aid by 10 percent. Here I am calculating the Odds Ratio to see how much exactly less likely a country is to receive any any aid after passing a restrictive law. This would provide a clearer punishment metric than a linear regression.
+\newline Below is a snippet of the code:
+\lstinputlisting[language=R, firstline=1184, lastline=1202]{rsw_replication_code_NK.R}
+
+Code explanation: I first create a binary outcome of whether the donor provides any aid at all, naming the variable gave-aid. Then I use a Logit model using a GLM to test if the enforcement of an NGO law in the previous year predicts the total withdrawal of aid, while controlling the donor’s level of democracy and also the presence of civil war. I then use stargazer to generate the results table, converting to odds ratio using exponential. So in the results, values greater than 1 represent an increase in the odds of receiving aid, while values less than 1 represent a decrease.
+
+\input{twist2_odds_table.tex}
+
+The results contradict what I expected. The results show that for countries passing a restrictive NGO law, the odds of receiving aid are 2.47 times higher compared to those that do not. The odds ratio for donor democracy is 0.425, indicating that democratic donors are 57.5 percent less likely to be in an aid relationship compared to non-democratic donors. This suggests that democracies are generally more selective in their aid partnerships. Finally, the results show that countries in civil war are 8 times more likely to receive aid, which is a typical humanitarian aid when a country is in a civil war. 
+\clearpage
+
+\section{Conclusion}
+Twist 1 shows that NGO laws are primarily triggered by domestic threats such as factors like Civil War rather than international aid signals. Twist 2 demonstrates that while donors might reduce the volume of their aid as the original study suggests post law enforcement, they rarely choose to exit the relationship entirely especially in conflict zones. Together, these findings suggest that the “punishment” for NGO restrictions is more nuanced than previously thought. It could be that donors trim their budgets to signal disapproval but maintain a presence to address humanitarian needs or maintain diplomatic leverage.
+\end{document}
